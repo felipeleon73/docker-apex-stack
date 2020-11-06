@@ -89,12 +89,19 @@ cd $BASE_DIR
 # The following is used for preparing "ready to use" images for internal use only.
 if [[ $RTU_ENABLED =~ (Y|y) ]]; then
   echo "##### Modify target Dockerfile #####"
-  REPLACEMENT_STRING=$'COPY scripts/setup/ \$ORACLE_BASE/scripts/setup/\\\nCOPY scripts/startup/ \$ORACLE_BASE/scripts/startup/\\\nCOPY files/ /tmp/files/\\\n'
-  sed $SED_OPTS "s|^VOLUME.+$|${REPLACEMENT_STRING}|g" dockerfiles/${DB_VERSION}/${DOCKER_FILE:-Dockerfile}
+  REPLACEMENT_STRING=$'WORKDIR /home/oracle\\\nCOPY scripts/setup/ \$ORACLE_BASE/scripts/setup/\\\nCOPY scripts/startup/ \$ORACLE_BASE/scripts/startup/\\\nUSER root\\\nCOPY files/ /tmp/files/\\\nRUN chmod a+x /tmp/files/init.sh \&\& /tmp/files/init.sh\\\nUSER oracle'
+  sed $SED_OPTS "s|^WORKDIR /home/oracle$|${REPLACEMENT_STRING}|g" dockerfiles/${DB_VERSION}/${DOCKER_FILE:-Dockerfile}
   mkdir -p dockerfiles/${DB_VERSION}/files
-  cp $FILES_DIR/$INSTALL_FILE_APEX $FILES_DIR/$INSTALL_FILE_ORDS $FILES_DIR/$INSTALL_FILE_JAVA dockerfiles/${DB_VERSION}/files/
+  cp $FILES_DIR/$INSTALL_FILE_APEX $FILES_DIR/$INSTALL_FILE_ORDS $FILES_DIR/$INSTALL_FILE_JAVA $FILES_DIR/init.sh dockerfiles/${DB_VERSION}/files/
   cp -R scripts dockerfiles/${DB_VERSION}/scripts
 fi
+
+  echo "##### Modify buildDockerImage #####"
+  REPLACEMENT_STRING='docker build --force-rm=true --no-cache=true --squash '
+  sed $SED_OPTS "s|^docker build --force-rm=true --no-cache=true|${REPLACEMENT_STRING}|g" dockerfiles/buildDockerImage.sh
+
+  echo "##### Modify createDB.sh #####"
+  sed $SED_OPTS "s|-gt 8|-gt 0|g"  dockerfiles/${DB_VERSION}/createDB.sh
 
 # Retain the DBUA to allow DB patching. See https://github.com/oracle/docker-images/issues/1187
 if [[ $ALLOW_DB_PATCHING =~ (Y|y) ]]; then
